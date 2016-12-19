@@ -1,0 +1,103 @@
+---
+title: "Survival rate on the Titanic"
+author: "Yuyu Zeng"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load and check data
+# Load packages
+
+```{r}
+library("caret")
+library("randomForest")
+library("rpart")
+library("rpart.plot")
+set.seed(1)
+train <- read.csv('train.csv')
+test  <- read.csv('test.csv')
+```
+
+# Create the training and testing data set
+```{r}
+inTrain <- createDataPartition(train$Survived, p=.75, list = FALSE)
+training <- train[inTrain,]
+testing <- training[-inTrain,]
+```
+Firstly, we read the train and test datasets. Then we further split the train dataset into training and testing datasets for our machine learning models.
+
+# Exploratory data analysis in the training set
+```{r}
+head(training)
+# Feature enginneering
+myfeature <- c("Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Cabin", "Embarked","Survived")
+newtraining <- training[, which(names(training) %in% myfeature)]
+# convert Pclass from interger to factor level
+newtraining$Pclass <- as.factor(newtraining$Pclass)
+summary(newtraining)
+str(newtraining)
+
+#gsub('1-9', '', newtraining$Cabin)
+#Check missing values
+sum(newtraining$Cabin == '')/nrow(newtraining)
+newtraining <- within(newtraining, rm(Cabin));
+head(newtraining)
+mss <- sapply(newtraining, function(x) sum(is.na(x)))
+mss
+as.numeric(mss[3])/nrow(newtraining)
+#unique(newtraining$Cabin)
+# How to deal with missing values of age
+```
+
+Intuitively we think ticket number and passenger ID are mostly probably irrelevant for their survival rate. We use "myfeature" to collect the class of relevant variables. Among all relevant features, "Pclass"" has three levels 1, 2 and 3. For "Sex"" we have both male and female. Both "Pclass" and "Sex" are stored in factor variables. We also notice that a lot of missing values for "Age" around 20 percent. Hence, we face the problem of how to impute the missing values for the "Age" variable. "SibSp", "Parch" and "Fare"" are stored in numerical values. "Embarked" are stored in factor variables. More than 75 percent of "Cabin" information is empty. 
+
+```{r}
+#remove rows in the dataset newtraining with missing values in "Age" 
+dim(newtraining)
+newtraining <- na.omit(newtraining)
+dim(newtraining)
+str(newtraining)
+```
+## Transformation in the testing test
+
+```{r}
+newtesting <- testing[, which(names(testing) %in% myfeature)]
+# convert Pclass from interger to factor level
+newtesting$Pclass <- as.factor(newtesting$Pclass)
+# remove cabin information
+newtesting <- within(newtesting, rm(Cabin))
+# remove rows with missing values
+newtesting <- na.omit(newtesting)
+dim(newtesting)
+head(newtesting)
+```
+
+#Models
+##logistic regression
+```{r}
+model_log <- glm(Survived ~.,family=binomial(link='logit'),data=newtraining)
+summary(model_log)
+predict <- predict(model_log, type = 'response')
+tab_training <- table(newtraining$Survived, predict > 0.5)
+sum(diag(tab_training))/sum(tab_training)
+predict_test <- predict(model_log, newtesting[2:8], type="response")
+tab_testing <- table(newtesting$Survived, predict_test > 0.5)
+sum(diag(tab_testing))/sum(tab_testing)
+```
+
+##random forest models
+```{r}
+model_rfm <- randomForest(as.factor(Survived) ~., data = newtraining)
+predict <- predict(model_rfm, type = 'response')
+table(newtraining$Survived, predict)
+#sum(diag(tab_training))/sum(tab_training)
+predict_test <- predict(model_rfm, newtesting[2:8], type="response")
+table(newtesting$Survived, predict_test)
+sum(diag(tab_testing))/sum(tab_testing)
+tree <- getTree(model_rfm,500, labelVar=TRUE)
+#ancyRpartPlot(tree)
+```
