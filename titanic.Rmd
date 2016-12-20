@@ -32,7 +32,34 @@ Firstly, we read the train and test datasets. Then we further split the train da
 
 # Exploratory data analysis in the training set
 ```{r}
-head(training)
+#head(training)
+# Grab title from passenger names
+training$Title <- gsub('(.*, )|(\\..*)', '', training$Name)
+testing$Title <- gsub('(.*, )|(\\..*)', '', testing$Name)
+#head(training)
+#head(testing)
+#nrow(training)
+unique(training$Title)
+unique(testing$Title)
+for (i in 1:length(unique(training$Title))){
+  title <- unique(training$Title)[i]
+  #print(title)
+  mean_title <- mean(training[training$Title == title,'Age'],na.rm=TRUE)
+  #print(mean_title)
+  for (j in 1:nrow(training)){
+  if (is.na(training$Age[j]) & training$Title[j] ==title){
+      training$Age[j] <- mean_title
+  }
+  }
+  for (k in 1:nrow(testing)){
+  if (is.na(testing$Age[k]) & testing$Title[k] ==title){
+      testing$Age[k] <- mean_title
+  }   
+  }
+}    
+#head(training)
+#head(testing)
+#mean(training[training$Title == unique(training$Title)[i],'Age'],na.rm=TRUE)
 # Feature enginneering
 myfeature <- c("Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Cabin", "Embarked","Survived")
 newtraining <- training[, which(names(training) %in% myfeature)]
@@ -48,7 +75,7 @@ newtraining <- within(newtraining, rm(Cabin));
 head(newtraining)
 mss <- sapply(newtraining, function(x) sum(is.na(x)))
 mss
-as.numeric(mss[3])/nrow(newtraining)
+as.numeric(mss[4])/nrow(newtraining)
 #unique(newtraining$Cabin)
 # How to deal with missing values of age
 ```
@@ -99,5 +126,4 @@ predict_test <- predict(model_rfm, newtesting[2:8], type="response")
 table(newtesting$Survived, predict_test)
 sum(diag(tab_testing))/sum(tab_testing)
 tree <- getTree(model_rfm,500, labelVar=TRUE)
-#ancyRpartPlot(tree)
 ```

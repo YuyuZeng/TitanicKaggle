@@ -117,7 +117,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">Survival rate on the Titanic</h1>
 <h4 class="author"><em>Yuyu Zeng</em></h4>
-<h4 class="date"><em>19 December, 2016</em></h4>
+<h4 class="date"><em>20 December, 2016</em></h4>
 
 </div>
 
@@ -140,6 +140,9 @@ $(document).ready(function () {
 <pre><code>## The following object is masked from 'package:ggplot2':
 ## 
 ##     margin</code></pre>
+<pre class="r"><code>library(&quot;rpart&quot;)
+library(&quot;rpart.plot&quot;)</code></pre>
+<pre><code>## Warning: package 'rpart.plot' was built under R version 3.2.5</code></pre>
 <pre class="r"><code>set.seed(1)
 train &lt;- read.csv('train.csv')
 test  &lt;- read.csv('test.csv')</code></pre>
@@ -153,29 +156,39 @@ testing &lt;- training[-inTrain,]</code></pre>
 </div>
 <div id="exploratory-data-analysis-in-the-training-set" class="section level1">
 <h1>Exploratory data analysis in the training set</h1>
-<pre class="r"><code>head(training)</code></pre>
-<pre><code>##    PassengerId Survived Pclass
-## 1            1        0      3
-## 4            4        1      1
-## 6            6        0      3
-## 8            8        0      3
-## 10          10        1      2
-## 11          11        1      3
-##                                            Name    Sex Age SibSp Parch
-## 1                       Braund, Mr. Owen Harris   male  22     1     0
-## 4  Futrelle, Mrs. Jacques Heath (Lily May Peel) female  35     1     0
-## 6                              Moran, Mr. James   male  NA     0     0
-## 8                Palsson, Master. Gosta Leonard   male   2     3     1
-## 10          Nasser, Mrs. Nicholas (Adele Achem) female  14     1     0
-## 11              Sandstrom, Miss. Marguerite Rut female   4     1     1
-##       Ticket    Fare Cabin Embarked
-## 1  A/5 21171  7.2500              S
-## 4     113803 53.1000  C123        S
-## 6     330877  8.4583              Q
-## 8     349909 21.0750              S
-## 10    237736 30.0708              C
-## 11   PP 9549 16.7000    G6        S</code></pre>
-<pre class="r"><code># Feature enginneering
+<pre class="r"><code>#head(training)
+# Grab title from passenger names
+training$Title &lt;- gsub('(.*, )|(\\..*)', '', training$Name)
+testing$Title &lt;- gsub('(.*, )|(\\..*)', '', testing$Name)
+#head(training)
+#head(testing)
+#nrow(training)
+unique(training$Title)</code></pre>
+<pre><code>##  [1] &quot;Mr&quot;       &quot;Mrs&quot;      &quot;Master&quot;   &quot;Miss&quot;     &quot;Don&quot;      &quot;Rev&quot;     
+##  [7] &quot;Dr&quot;       &quot;Mme&quot;      &quot;Ms&quot;       &quot;Major&quot;    &quot;Lady&quot;     &quot;Sir&quot;     
+## [13] &quot;Mlle&quot;     &quot;Col&quot;      &quot;Capt&quot;     &quot;Jonkheer&quot;</code></pre>
+<pre class="r"><code>unique(testing$Title)</code></pre>
+<pre><code>## [1] &quot;Mrs&quot;    &quot;Mr&quot;     &quot;Miss&quot;   &quot;Rev&quot;    &quot;Master&quot; &quot;Dr&quot;     &quot;Mlle&quot;   &quot;Col&quot;</code></pre>
+<pre class="r"><code>for (i in 1:length(unique(training$Title))){
+  title &lt;- unique(training$Title)[i]
+  #print(title)
+  mean_title &lt;- mean(training[training$Title == title,'Age'],na.rm=TRUE)
+  #print(mean_title)
+  for (j in 1:nrow(training)){
+  if (is.na(training$Age[j]) &amp; training$Title[j] ==title){
+      training$Age[j] &lt;- mean_title
+  }
+  }
+  for (k in 1:nrow(testing)){
+  if (is.na(testing$Age[k]) &amp; testing$Title[k] ==title){
+      testing$Age[k] &lt;- mean_title
+  }   
+  }
+}    
+#head(training)
+#head(testing)
+#mean(training[training$Title == unique(training$Title)[i],'Age'],na.rm=TRUE)
+# Feature enginneering
 myfeature &lt;- c(&quot;Pclass&quot;, &quot;Sex&quot;, &quot;Age&quot;, &quot;SibSp&quot;, &quot;Parch&quot;, &quot;Fare&quot;, &quot;Cabin&quot;, &quot;Embarked&quot;,&quot;Survived&quot;)
 newtraining &lt;- training[, which(names(training) %in% myfeature)]
 # convert Pclass from interger to factor level
@@ -183,12 +196,12 @@ newtraining$Pclass &lt;- as.factor(newtraining$Pclass)
 summary(newtraining)</code></pre>
 <pre><code>##     Survived      Pclass      Sex           Age            SibSp       
 ##  Min.   :0.0000   1:173   female:235   Min.   : 0.42   Min.   :0.0000  
-##  1st Qu.:0.0000   2:129   male  :434   1st Qu.:20.00   1st Qu.:0.0000  
-##  Median :0.0000   3:367                Median :28.00   Median :0.0000  
-##  Mean   :0.3812                        Mean   :29.32   Mean   :0.5396  
-##  3rd Qu.:1.0000                        3rd Qu.:38.00   3rd Qu.:1.0000  
+##  1st Qu.:0.0000   2:129   male  :434   1st Qu.:21.29   1st Qu.:0.0000  
+##  Median :0.0000   3:367                Median :30.00   Median :0.0000  
+##  Mean   :0.3812                        Mean   :29.46   Mean   :0.5396  
+##  3rd Qu.:1.0000                        3rd Qu.:36.00   3rd Qu.:1.0000  
 ##  Max.   :1.0000                        Max.   :71.00   Max.   :8.0000  
-##                                        NA's   :130                     
+##                                                                        
 ##      Parch             Fare                 Cabin     Embarked
 ##  Min.   :0.0000   Min.   :  0.000              :507    :  2   
 ##  1st Qu.:0.0000   1st Qu.:  7.896   B96 B98    :  4   C:136   
@@ -202,7 +215,7 @@ summary(newtraining)</code></pre>
 ##  $ Survived: int  0 1 0 0 1 1 1 0 1 0 ...
 ##  $ Pclass  : Factor w/ 3 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;: 3 1 3 3 2 3 1 3 2 3 ...
 ##  $ Sex     : Factor w/ 2 levels &quot;female&quot;,&quot;male&quot;: 2 1 2 2 1 1 1 2 1 2 ...
-##  $ Age     : num  22 35 NA 2 14 4 58 39 55 2 ...
+##  $ Age     : num  22 35 32.1 2 14 ...
 ##  $ SibSp   : int  1 1 0 3 1 1 0 1 0 4 ...
 ##  $ Parch   : int  0 0 0 1 0 1 0 5 0 1 ...
 ##  $ Fare    : num  7.25 53.1 8.46 21.07 30.07 ...
@@ -214,18 +227,18 @@ sum(newtraining$Cabin == '')/nrow(newtraining)</code></pre>
 <pre><code>## [1] 0.7578475</code></pre>
 <pre class="r"><code>newtraining &lt;- within(newtraining, rm(Cabin));
 head(newtraining)</code></pre>
-<pre><code>##    Survived Pclass    Sex Age SibSp Parch    Fare Embarked
-## 1         0      3   male  22     1     0  7.2500        S
-## 4         1      1 female  35     1     0 53.1000        S
-## 6         0      3   male  NA     0     0  8.4583        Q
-## 8         0      3   male   2     3     1 21.0750        S
-## 10        1      2 female  14     1     0 30.0708        C
-## 11        1      3 female   4     1     1 16.7000        S</code></pre>
+<pre><code>##    Survived Pclass    Sex      Age SibSp Parch    Fare Embarked
+## 1         0      3   male 22.00000     1     0  7.2500        S
+## 4         1      1 female 35.00000     1     0 53.1000        S
+## 6         0      3   male 32.12799     0     0  8.4583        Q
+## 8         0      3   male  2.00000     3     1 21.0750        S
+## 10        1      2 female 14.00000     1     0 30.0708        C
+## 11        1      3 female  4.00000     1     1 16.7000        S</code></pre>
 <pre class="r"><code>mss &lt;- sapply(newtraining, function(x) sum(is.na(x)))
 mss</code></pre>
 <pre><code>## Survived   Pclass      Sex      Age    SibSp    Parch     Fare Embarked 
-##        0        0        0      130        0        0        0        0</code></pre>
-<pre class="r"><code>as.numeric(mss[3])/nrow(newtraining)</code></pre>
+##        0        0        0        0        0        0        0        0</code></pre>
+<pre class="r"><code>as.numeric(mss[4])/nrow(newtraining)</code></pre>
 <pre><code>## [1] 0</code></pre>
 <pre class="r"><code>#unique(newtraining$Cabin)
 # How to deal with missing values of age</code></pre>
@@ -235,19 +248,17 @@ dim(newtraining)</code></pre>
 <pre><code>## [1] 669   8</code></pre>
 <pre class="r"><code>newtraining &lt;- na.omit(newtraining)
 dim(newtraining)</code></pre>
-<pre><code>## [1] 539   8</code></pre>
+<pre><code>## [1] 669   8</code></pre>
 <pre class="r"><code>str(newtraining)</code></pre>
-<pre><code>## 'data.frame':    539 obs. of  8 variables:
-##  $ Survived: int  0 1 0 1 1 1 0 1 0 0 ...
-##  $ Pclass  : Factor w/ 3 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;: 3 1 3 2 3 1 3 2 3 3 ...
-##  $ Sex     : Factor w/ 2 levels &quot;female&quot;,&quot;male&quot;: 2 1 2 1 1 1 2 1 2 1 ...
-##  $ Age     : num  22 35 2 14 4 58 39 55 2 31 ...
-##  $ SibSp   : int  1 1 3 1 1 0 1 0 4 1 ...
-##  $ Parch   : int  0 0 1 0 1 0 5 0 1 0 ...
-##  $ Fare    : num  7.25 53.1 21.07 30.07 16.7 ...
-##  $ Embarked: Factor w/ 4 levels &quot;&quot;,&quot;C&quot;,&quot;Q&quot;,&quot;S&quot;: 4 4 4 2 4 4 4 4 3 4 ...
-##  - attr(*, &quot;na.action&quot;)=Class 'omit'  Named int [1:130] 3 12 17 18 19 21 24 30 33 34 ...
-##   .. ..- attr(*, &quot;names&quot;)= chr [1:130] &quot;6&quot; &quot;20&quot; &quot;27&quot; &quot;29&quot; ...</code></pre>
+<pre><code>## 'data.frame':    669 obs. of  8 variables:
+##  $ Survived: int  0 1 0 0 1 1 1 0 1 0 ...
+##  $ Pclass  : Factor w/ 3 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;: 3 1 3 3 2 3 1 3 2 3 ...
+##  $ Sex     : Factor w/ 2 levels &quot;female&quot;,&quot;male&quot;: 2 1 2 2 1 1 1 2 1 2 ...
+##  $ Age     : num  22 35 32.1 2 14 ...
+##  $ SibSp   : int  1 1 0 3 1 1 0 1 0 4 ...
+##  $ Parch   : int  0 0 0 1 0 1 0 5 0 1 ...
+##  $ Fare    : num  7.25 53.1 8.46 21.07 30.07 ...
+##  $ Embarked: Factor w/ 4 levels &quot;&quot;,&quot;C&quot;,&quot;Q&quot;,&quot;S&quot;: 4 4 3 4 2 4 4 4 4 3 ...</code></pre>
 <div id="transformation-in-the-testing-test" class="section level2">
 <h2>Transformation in the testing test</h2>
 <pre class="r"><code>newtesting &lt;- testing[, which(names(testing) %in% myfeature)]
@@ -258,15 +269,15 @@ newtesting &lt;- within(newtesting, rm(Cabin))
 # remove rows with missing values
 newtesting &lt;- na.omit(newtesting)
 dim(newtesting)</code></pre>
-<pre><code>## [1] 134   8</code></pre>
+<pre><code>## [1] 163   8</code></pre>
 <pre class="r"><code>head(newtesting)</code></pre>
-<pre><code>##    Survived Pclass    Sex Age SibSp Parch    Fare Embarked
-## 4         1      1 female  35     1     0 53.1000        S
-## 10        1      2 female  14     1     0 30.0708        C
-## 12        1      1 female  58     0     0 26.5500        S
-## 16        1      2 female  55     0     0 16.0000        S
-## 22        1      2   male  34     0     0 13.0000        S
-## 24        1      1   male  28     0     0 35.5000        S</code></pre>
+<pre><code>##    Survived Pclass    Sex      Age SibSp Parch    Fare Embarked
+## 4         1      1 female 35.00000     1     0 53.1000        S
+## 6         0      3   male 32.12799     0     0  8.4583        Q
+## 10        1      2 female 14.00000     1     0 30.0708        C
+## 12        1      1 female 58.00000     0     0 26.5500        S
+## 16        1      2 female 55.00000     0     0 16.0000        S
+## 22        1      2   male 34.00000     0     0 13.0000        S</code></pre>
 </div>
 </div>
 <div id="models" class="section level1">
@@ -282,39 +293,39 @@ summary(model_log)</code></pre>
 ## 
 ## Deviance Residuals: 
 ##     Min       1Q   Median       3Q      Max  
-## -2.6812  -0.6596  -0.3960   0.6469   2.4546  
+## -2.6515  -0.5975  -0.4141   0.6058   2.4743  
 ## 
 ## Coefficients:
 ##               Estimate Std. Error z value Pr(&gt;|z|)    
-## (Intercept)  16.757855 605.383739   0.028  0.97792    
-## Pclass2      -1.099618   0.372612  -2.951  0.00317 ** 
-## Pclass3      -2.251901   0.385076  -5.848 4.98e-09 ***
-## Sexmale      -2.559494   0.254737 -10.048  &lt; 2e-16 ***
-## Age          -0.045803   0.009434  -4.855 1.20e-06 ***
-## SibSp        -0.360496   0.142132  -2.536  0.01120 *  
-## Parch        -0.108304   0.144132  -0.751  0.45240    
-## Fare          0.002265   0.002851   0.794  0.42702    
-## EmbarkedC   -12.479419 605.383565  -0.021  0.98355    
-## EmbarkedQ   -13.271856 605.383835  -0.022  0.98251    
-## EmbarkedS   -12.865728 605.383548  -0.021  0.98304    
+## (Intercept)  16.810407 604.991962   0.028  0.97783    
+## Pclass2      -0.979692   0.344813  -2.841  0.00449 ** 
+## Pclass3      -2.068606   0.338136  -6.118 9.49e-10 ***
+## Sexmale      -2.721057   0.236426 -11.509  &lt; 2e-16 ***
+## Age          -0.046734   0.009101  -5.135 2.82e-07 ***
+## SibSp        -0.377383   0.123886  -3.046  0.00232 ** 
+## Parch        -0.122778   0.140138  -0.876  0.38097    
+## Fare          0.002244   0.002632   0.852  0.39401    
+## EmbarkedC   -12.407054 604.991800  -0.021  0.98364    
+## EmbarkedQ   -12.902591 604.991894  -0.021  0.98298    
+## EmbarkedS   -12.948939 604.991787  -0.021  0.98292    
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## (Dispersion parameter for binomial family taken to be 1)
 ## 
-##     Null deviance: 726.63  on 538  degrees of freedom
-## Residual deviance: 484.38  on 528  degrees of freedom
-## AIC: 506.38
+##     Null deviance: 889.28  on 668  degrees of freedom
+## Residual deviance: 583.97  on 658  degrees of freedom
+## AIC: 605.97
 ## 
 ## Number of Fisher Scoring iterations: 13</code></pre>
 <pre class="r"><code>predict &lt;- predict(model_log, type = 'response')
 tab_training &lt;- table(newtraining$Survived, predict &gt; 0.5)
 sum(diag(tab_training))/sum(tab_training)</code></pre>
-<pre><code>## [1] 0.8107607</code></pre>
+<pre><code>## [1] 0.8056801</code></pre>
 <pre class="r"><code>predict_test &lt;- predict(model_log, newtesting[2:8], type=&quot;response&quot;)
 tab_testing &lt;- table(newtesting$Survived, predict_test &gt; 0.5)
 sum(diag(tab_testing))/sum(tab_testing)</code></pre>
-<pre><code>## [1] 0.761194</code></pre>
+<pre><code>## [1] 0.7791411</code></pre>
 </div>
 <div id="random-forest-models" class="section level2">
 <h2>random forest models</h2>
@@ -323,17 +334,17 @@ predict &lt;- predict(model_rfm, type = 'response')
 table(newtraining$Survived, predict)</code></pre>
 <pre><code>##    predict
 ##       0   1
-##   0 292  30
-##   1  69 148</code></pre>
+##   0 376  38
+##   1  75 180</code></pre>
 <pre class="r"><code>#sum(diag(tab_training))/sum(tab_training)
 predict_test &lt;- predict(model_rfm, newtesting[2:8], type=&quot;response&quot;)
 table(newtesting$Survived, predict_test)</code></pre>
 <pre><code>##    predict_test
 ##      0  1
-##   0 70  3
-##   1 15 46</code></pre>
+##   0 88  5
+##   1 19 51</code></pre>
 <pre class="r"><code>sum(diag(tab_testing))/sum(tab_testing)</code></pre>
-<pre><code>## [1] 0.761194</code></pre>
+<pre><code>## [1] 0.7791411</code></pre>
 <pre class="r"><code>tree &lt;- getTree(model_rfm,500, labelVar=TRUE)</code></pre>
 </div>
 </div>
