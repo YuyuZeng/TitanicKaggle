@@ -1,7 +1,7 @@
 ---
 title: "Survival rate on the Titanic"
 author: "Yuyu Zeng"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: ''
 output: html_document
 ---
 
@@ -17,7 +17,7 @@ library("caret")
 library("randomForest")
 library("rpart")
 library("rpart.plot")
-set.seed(1)
+set.seed(2)
 train <- read.csv('train.csv')
 test  <- read.csv('test.csv')
 ```
@@ -43,19 +43,25 @@ unique(training$Title)
 unique(testing$Title)
 for (i in 1:length(unique(training$Title))){
   title <- unique(training$Title)[i]
-  #print(title)
+  print(title)
   mean_title <- mean(training[training$Title == title,'Age'],na.rm=TRUE)
   #print(mean_title)
+  number_training <- 0
+  number_testing <- 0
   for (j in 1:nrow(training)){
   if (is.na(training$Age[j]) & training$Title[j] ==title){
+      number_training <- number_training+1
       training$Age[j] <- mean_title
   }
   }
+  print(number_training)
   for (k in 1:nrow(testing)){
   if (is.na(testing$Age[k]) & testing$Title[k] ==title){
+      number_testing <- number_testing +1 
       testing$Age[k] <- mean_title
   }   
   }
+  print(number_testing)
 }    
 #head(training)
 #head(testing)
@@ -80,7 +86,7 @@ as.numeric(mss[4])/nrow(newtraining)
 # How to deal with missing values of age
 ```
 
-Intuitively we think ticket number and passenger ID are mostly probably irrelevant for their survival rate. We use "myfeature" to collect the class of relevant variables. Among all relevant features, "Pclass"" has three levels 1, 2 and 3. For "Sex"" we have both male and female. Both "Pclass" and "Sex" are stored in factor variables. We also notice that a lot of missing values for "Age" around 20 percent. Hence, we face the problem of how to impute the missing values for the "Age" variable. "SibSp", "Parch" and "Fare"" are stored in numerical values. "Embarked" are stored in factor variables. More than 75 percent of "Cabin" information is empty. 
+Intuitively we think ticket number and passenger ID are mostly probably irrelevant for their survival rate. We use "myfeature" to collect the class of relevant variables. Among all relevant features, "Pclass"" has three levels 1, 2 and 3. For "Sex"" we have both male and female. Both "Pclass" and "Sex" are stored in factor variables. We also notice that a lot of missing values for "Age" around 20 percent. Hence, we face the problem of how to impute the missing values for the "Age" variable. We extract passenger title from their names and impute the missing information of age by inserting the mean age of the corresponding group classified by title. "SibSp", "Parch" and "Fare"" are stored in numerical values. "Embarked" are stored in factor variables. More than 75 percent of "Cabin" information is empty. 
 
 ```{r}
 #remove rows in the dataset newtraining with missing values in "Age" 
@@ -99,6 +105,8 @@ newtesting$Pclass <- as.factor(newtesting$Pclass)
 newtesting <- within(newtesting, rm(Cabin))
 # remove rows with missing values
 newtesting <- na.omit(newtesting)
+mss <- sapply(newtesting, function(x) sum(is.na(x)))
+mss
 dim(newtesting)
 head(newtesting)
 ```
@@ -106,13 +114,13 @@ head(newtesting)
 #Models
 ##logistic regression
 ```{r}
-model_log <- glm(Survived ~.,family=binomial(link='logit'),data=newtraining)
+model_log <- glm(as.factor(Survived) ~.,family=binomial(link='logit'),data=newtraining)
 summary(model_log)
 predict <- predict(model_log, type = 'response')
-tab_training <- table(newtraining$Survived, predict > 0.5)
+tab_training <- table(newtraining$Survived, predict>0.5)
 sum(diag(tab_training))/sum(tab_training)
 predict_test <- predict(model_log, newtesting[2:8], type="response")
-tab_testing <- table(newtesting$Survived, predict_test > 0.5)
+tab_testing <- table(newtesting$Survived, predict_test>0.5)
 sum(diag(tab_testing))/sum(tab_testing)
 ```
 
@@ -120,10 +128,25 @@ sum(diag(tab_testing))/sum(tab_testing)
 ```{r}
 model_rfm <- randomForest(as.factor(Survived) ~., data = newtraining)
 predict <- predict(model_rfm, type = 'response')
-table(newtraining$Survived, predict)
-#sum(diag(tab_training))/sum(tab_training)
+tab_training <- table(newtraining$Survived, predict)
+sum(diag(tab_training))/sum(tab_training)
 predict_test <- predict(model_rfm, newtesting[2:8], type="response")
-table(newtesting$Survived, predict_test)
+tab_testing <- table(newtesting$Survived, predict_test)
 sum(diag(tab_testing))/sum(tab_testing)
 tree <- getTree(model_rfm,500, labelVar=TRUE)
+```
+
+##decision tree model
+```{r}
+model_dtm <-rpart(Survived~.,newtraining, method = "class")
+predict <-predict(model_dtm,newtesting, type="class")
+predict
+tab_training <- table(newtesting$Survived, predict)
+tab_training
+sum(diag(tab_training))/sum(tab_training)
+predict_test <- predict(model_rfm, newtesting[2:8], type="class")
+tab_testing <- table(newtesting$Survived, predict_test)
+sum(diag(tab_testing))/sum(tab_testing)
+plot(model_dtm, uniform=TRUE, main="Classification Tree for Survival Analysis")
+text(model_dtm, use.n=TRUE, all=TRUE, cex=.8)
 ```
