@@ -16,6 +16,7 @@ library("caret")
 library("randomForest")
 library("rpart")
 library("tree")
+library("rattle")
 library("rpart.plot")
 set.seed(2)
 ```
@@ -56,7 +57,7 @@ for (i in 1:length(unique(training$Title))){
 myfeature <- c("Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Cabin", "Embarked","Survived")
 newtraining <- training[, which(names(training) %in% myfeature)]
 # Convert Pclass and Sex from interger values to factor level
-newtraining$Pclass <- as.factor(newtraining$Pclass)
+#newtraining$Pclass <- as.factor(newtraining$Pclass)
 newtraining$Sex <- as.factor(newtraining$Sex)
 # Check proportion of missing values in the cabin information and remove the cabin column
 sum(newtraining$Cabin == '')/nrow(newtraining)
@@ -76,7 +77,7 @@ We do similar transformations in the testing data sets, i.e., grabbing relevant 
 ```{r}
 newtesting <- testing[, which(names(testing) %in% myfeature)]
 # convert Pclass from interger to factor level
-newtesting$Pclass <- as.factor(newtesting$Pclass)
+#newtesting$Pclass <- as.factor(newtesting$Pclass)
 newtesting$Sex <- as.factor(newtesting$Sex)
 # remove cabin information
 newtesting <- within(newtesting, rm(Cabin))
@@ -115,15 +116,13 @@ sum(diag(tab_testing))/sum(tab_testing)
 
 ## Decision tree model
 ```{r}
+str(newtraining)
 model_dtm <-rpart(as.factor(Survived)~.,newtraining, method = "class")
-#summary(model_dtm)
 predict <-predict(model_dtm,newtesting, type="class")
-#predict
 tab_training <- table(newtesting$Survived, predict)
 sum(diag(tab_training))/sum(tab_training)
-predict_test <- predict(model_rfm, newtesting[2:8], type="class")
+predict_test <- predict(model_dtm, newtesting[2:8], type="class")
 tab_testing <- table(newtesting$Survived, predict_test)
 sum(diag(tab_testing))/sum(tab_testing)
-plot(model_dtm, uniform=TRUE, main="Classification Tree for Survival Analysis on the Titanic Datasets")
-text(model_dtm, use.n=TRUE, all=TRUE, cex=.8)
+fancyRpartPlot(model_dtm)
 ```
