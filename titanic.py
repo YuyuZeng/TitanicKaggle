@@ -4,7 +4,8 @@ import re
 from sklearn.cross_validation import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn import tree
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from os import system
 
 #read train and test data
 train = pd.read_csv("train.csv", header = 0, sep = ",")
@@ -16,7 +17,6 @@ train.replace('', np.nan, inplace=True)
 #split the training and testing dataset
 y = train['Survived']
 train = train.drop('Survived',1)
-myfeatures = ["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Cabin", "Embarked"]
 X_train, X_test, y_train, y_test = train_test_split(train, y, test_size=0.25, random_state=2)
 
 #generate a new column named Title in the train and testing dataset
@@ -38,7 +38,7 @@ Title_test=pd.DataFrame(Title_test)
 X_test = pd.concat([X_test, Title_test],axis=1)
 X_test.columns.values[11]='Title'
 
-#fill in missing values in Age in the training and testing data set using information from training data set
+#fill in missing values in Age in the training and testing data set using mean age grouped by title from training data set
 for elem in X_train.Title.unique():
     title = elem
     mean_title = np.mean(X_train[X_train.Title==title]['Age'])
@@ -53,6 +53,7 @@ for elem in X_train.Title.unique():
 #print X_test[['Age']].isnull().any().any()
 
 #extract relevant features in the train and test datasets
+myfeatures = ["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Cabin", "Embarked"]
 X_train = X_train[myfeatures]
 X_test = X_test[myfeatures]
 #check proportions of missing values
@@ -73,15 +74,14 @@ X_train.drop(X_train.index[null_row])
 y_train.drop(y_train.index[null_row])
 #print X_train.shape
 
-
-
 #Logistic Regression
 model_log = LogisticRegression(fit_intercept = False, C = 1e9)
 #print X_train.dtypes
 #print y_train.dtypes
+print X_train.head(5)
 X_train = pd.get_dummies(X_train,columns=['Sex','Embarked','Pclass'])
-print X_train.shape
-print X_train.dtypes
+#print X_train.shape
+#print X_train.dtypes
 #print X_train.head(5)
 y_train=y_train.as_matrix()
 X_train=X_train.as_matrix()
@@ -95,17 +95,22 @@ y_test=y_test.as_matrix()
 X_test=X_test.as_matrix()
 print model_log.score(X_train,y_train)
 print model_log.score(X_test, y_test)
-print model_log.intercept_, model_log.coef_
+#print model_log.intercept_, model_log.coef_
 
-if False:
 #random forest model
- model_rfm = RandomForestClassifier(n_estimators=10, oob_score=True)
- model_rfm.fit(X_train, y_train)
- print model_rfm.score(X_train,y_train)
- print model_rfm.score(X_test, y_test)
+model_rfm = RandomForestClassifier(n_estimators=5, oob_score=True)
+model_rfm.fit(X_train, y_train)
+print model_rfm.score(X_train,y_train)
+print model_rfm.score(X_test, y_test)
 
 #decision tree model
- model_dtm = tree.DecisionTreeClassifier(max_depth=9, criterion="entropy")
- model_dtm.fit(X_train,y_train)
- print model_dtm.score(X_train,y_train)
- print model_dtm.score(X_test, y_test)
+model_dtm = DecisionTreeClassifier(max_depth=9, criterion="entropy")
+model_dtm.fit(X_train,y_train)
+print model_dtm.score(X_train,y_train)
+print model_dtm.score(X_test, y_test)
+#print X_train[0:5]
+columns = ['Age','SibSp','Parch','Fare','Sex_Female','Sex_Male','Embarked_C','Embarked_Q','Embarked_S','Pclass_1','Pclass_2','Pclass3']
+dotfile = open("tree.dot", 'w')
+export_graphviz(model_dtm, out_file='tree.dot', feature_names=columns)
+dotfile.close()
+system("dot -Tpng tree.dot -o tree.png")
