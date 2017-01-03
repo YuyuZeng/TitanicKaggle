@@ -1,7 +1,7 @@
 ---
-title: "Survival rate on the Titanic"
+title: "Predicting Survival Rate on the Titanic With Several Machine Learning Models"
 author: "Yuyu Zeng"
-date: "December 22, 2016"
+date: "January 3, 2017"
 output: html_document
 ---
 
@@ -10,88 +10,69 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Load packages
+In this project, we need the following packages: caret, randomForest, tree, rpart and rpart.plot.
 ```{r}
 library("caret")
 library("randomForest")
 library("rpart")
 library("tree")
-#library("rattle")
 library("rpart.plot")
 set.seed(2)
-train <- read.csv('train.csv')
-test  <- read.csv('test.csv')
 ```
 
-# Create the training and testing data set
+# Load datasets, create the training and testing datasets
+We read the train and test datasets. Note that we train our model using the train dataset and the test dataset is used to report the test result. In order to train our model, we further split the train dataset into our training and testing datasets with 75 percent in the training dataset and the remaining in the testing dataset.
 ```{r}
+train <- read.csv('train.csv')
+test  <- read.csv('test.csv')
 inTrain <- createDataPartition(train$Survived, p=.75, list = FALSE)
 training <- train[inTrain,]
 testing <- training[-inTrain,]
 ```
-Firstly, we read the train and test datasets. Then we further split the train dataset into training and testing datasets for our machine learning models.
 
-#Feature engineering
-##Dealing with missing values and transformations in the training dataset
+# Feature engineering
+## Dealing with missing values in the training dataset
 ```{r}
-#head(training)
 # Grab title from passenger names
 training$Title <- gsub('(.*, )|(\\..*)', '', training$Name)
 testing$Title <- gsub('(.*, )|(\\..*)', '', testing$Name)
-#head(training)
-#head(testing)
-#nrow(training)
-#unique(training$Title)
-#unique(testing$Title)
-#unique(testing$Title) %in% unique(training$Title)
-#imputing missing values for "Age" in the training and testing dataset based on the information in the training dataset
+# Impute missing values for "Age" in the training and testing dataset 
+# based on the information in the training dataset
 for (i in 1:length(unique(training$Title))){
   title <- unique(training$Title)[i]
-  #print(title)
   mean_title <- mean(training[training$Title == title,'Age'],na.rm=TRUE)
-  #print(mean_title)
-  number_training <- 0
-  number_testing <- 0
   for (j in 1:nrow(training)){
   if (is.na(training$Age[j]) & training$Title[j] ==title){
-      number_training <- number_training+1
       training$Age[j] <- mean_title
+    }
   }
-  }
-  #print(number_training)
   for (k in 1:nrow(testing)){
   if (is.na(testing$Age[k]) & testing$Title[k] ==title){
-      number_testing <- number_testing +1 
       testing$Age[k] <- mean_title
-  }   
+    }   
   }
-  #print(number_testing)
 }    
-
+# Extract features that are useful for our machine learning models
 myfeature <- c("Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Cabin", "Embarked","Survived")
 newtraining <- training[, which(names(training) %in% myfeature)]
-#convert Pclass from interger to factor level
+# Convert Pclass and Sex from interger values to factor level
 newtraining$Pclass <- as.factor(newtraining$Pclass)
 newtraining$Sex <- as.factor(newtraining$Sex)
-#summary(newtraining)
-#str(newtraining)
-
-#Check missing values
+# Check proportion of missing values in the cabin information and remove the cabin column
 sum(newtraining$Cabin == '')/nrow(newtraining)
 newtraining <- within(newtraining, rm(Cabin))
-#head(newtraining)
-sapply(newtraining, function(x) sum(is.na(x)))
-dim(newtraining)
+# Empty string replaced by NA
 newtraining[newtraining==""] <- NA
+# Remove rows with missing values
 newtraining <- na.omit(newtraining)
-dim(newtraining)
-#str(newtraining)
-#head(newtraining)
+round(sapply(newtraining, function(x) sum(is.na(x))),5)
+str(newtraining)
 ```
 
-Intuitively we think ticket number and passenger ID are mostly probably irrelevant for their survival rate. We use "myfeature" to collect relevant features. Among all relevant features, "Pclass"" has three levels 1, 2 and 3. For "Sex"" we have both male and female. Both "Pclass" and "Sex" are stored in factor variables. We also notice that a lot of missing values for "Age" and it accounts for roughly 20 percent. Hence, we face the problem of how to impute the missing values for the "Age" variable. We extract passenger title from their names and impute the missing information of age by inserting the mean age of the corresponding group classified by title. "SibSp", "Parch" and "Fare"" are stored in numerical values. "Embarked" are stored in factor variables. More than 75 percent of "Cabin" information is empty. Therefore, we decide to discard the information of "Cabin".
+Intuitively we think ticket number and passenger ID are mostly probably irrelevant for their survival rate. We use "myfeature" to collect relevant features. Among all relevant features, "Pclass"" has three levels 1, 2 and 3. For "Sex"" we have both male and female. Both "Pclass" and "Sex" are converted into factor variables. We also notice that a lot of missing values for "Age" and it accounts for roughly 20 percent. Hence, we face the problem of how to impute the missing values for the "Age" variable. We extract passenger title from their names and impute the missing information of age by inserting the mean age of the corresponding group classified by title. "SibSp", "Parch" and "Fare"" are stored in numerical values. "Embarked" are stored in factor variables. More than 75 percent of "Cabin" information is empty. Therefore, we decide to discard the information of "Cabin".
 
-##Transformation in the testing test
-We do similar transformations in the testing data sets, i.e., grabbing relevant features, converting passenger class into factor variables, removing the feature of "Cabin". At the end, we can see there is no missing values in our features matrix anymore. 
+## Transformation in the testing test
+We do similar transformations in the testing data sets, i.e., grabbing relevant features, converting passenger class and gender into factor variables, removing the feature of "Cabin". At the end, we can see there is no missing values in our features matrix anymore. 
 ```{r}
 newtesting <- testing[, which(names(testing) %in% myfeature)]
 # convert Pclass from interger to factor level
@@ -100,18 +81,19 @@ newtesting$Sex <- as.factor(newtesting$Sex)
 # remove cabin information
 newtesting <- within(newtesting, rm(Cabin))
 # remove rows with missing values
-dim(newtesting)
 newtesting[newtesting==""] <- NA
 newtesting <- na.omit(newtesting)
-sapply(newtesting, function(x) sum(is.na(x)))
-dim(newtesting)
+round(sapply(newtesting, function(x) sum(is.na(x))),5)
+str(newtesting)
 ```
 
-#Machine Learning Models
-##logistic regression
+# Machine Learning Models
+In this section, we implement three machine learning models: logistic regression, random forest and decision tree models. We report accuracy rate on the training and test data sets correspondingly. 
+
+## Logistic regression
 ```{r}
 model_log <- glm(as.factor(Survived) ~.,family=binomial(link='logit'),data=newtraining)
-summary(model_log)
+summary(model_log)$coef
 predict <- predict(model_log, type = 'response')
 tab_training <- table(newtraining$Survived, predict>0.5)
 sum(diag(tab_training))/sum(tab_training)
@@ -120,7 +102,7 @@ tab_testing <- table(newtesting$Survived, predict_test>0.5)
 sum(diag(tab_testing))/sum(tab_testing)
 ```
 
-##random forest models
+## Random forest model
 ```{r}
 model_rfm <- randomForest(as.factor(Survived) ~., data = newtraining)
 predict <- predict(model_rfm, type = 'response')
@@ -131,15 +113,13 @@ tab_testing <- table(newtesting$Survived, predict_test)
 sum(diag(tab_testing))/sum(tab_testing)
 ```
 
-##decision tree model
+## Decision tree model
 ```{r}
-str(newtraining)
-model_dtm <-rpart(Survived~.,newtraining, method = "class")
+model_dtm <-rpart(as.factor(Survived)~.,newtraining, method = "class")
 #summary(model_dtm)
 predict <-predict(model_dtm,newtesting, type="class")
 #predict
 tab_training <- table(newtesting$Survived, predict)
-tab_training
 sum(diag(tab_training))/sum(tab_training)
 predict_test <- predict(model_rfm, newtesting[2:8], type="class")
 tab_testing <- table(newtesting$Survived, predict_test)
